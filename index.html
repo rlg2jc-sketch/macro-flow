@@ -170,7 +170,7 @@
 
       const saveToFrequentFoods = (foodItem) => {
         const filtered = frequentFoods.filter(item => item.name.toLowerCase() !== foodItem.name.toLowerCase());
-        const updated = [foodItem, ...filtered].slice(0, 10); // Keep top 10 recent unique items
+        const updated = [foodItem, ...filtered].slice(0, 10);
         setFrequentFoods(updated);
       };
 
@@ -302,67 +302,101 @@
         setEditingEntryId(null);
       };
 
-      // Hybrid Food Lookup System (Built-in Dictionary -> Live Open Food Facts API -> Categorized Smart Estimator)
+      // Upgraded Multi-API Search Engine (Built-in DB -> Open Food Facts -> USDA Branded DB -> Smart Estimator)
       const handleAISearch = async (e) => {
         e.preventDefault();
         const rawQuery = searchQuery.trim().toLowerCase();
         if (!rawQuery) return;
         setIsSearching(true);
 
-        // 1. Check Built-in Dictionary (Whole Foods & Drinks)
+        // Tier 1: Built-in Dictionary
         if (BUILTIN_FOOD_DB[rawQuery]) {
-          const match = BUILTIN_FOOD_DB[rawQuery];
-          setSearchResult({ ...match, source: 'Verified Whole Food' });
+          setSearchResult({ ...BUILTIN_FOOD_DB[rawQuery], source: 'Verified Whole Food' });
           setIsSearching(false);
           return;
         }
 
-        // Search partial matches in Built-in DB (e.g. "red apple")
         const partialKey = Object.keys(BUILTIN_FOOD_DB).find(k => rawQuery.includes(k) || k.includes(rawQuery));
         if (partialKey) {
-          const match = BUILTIN_FOOD_DB[partialKey];
-          setSearchResult({ ...match, name: searchQuery, source: 'Verified Whole Food' });
+          setSearchResult({ ...BUILTIN_FOOD_DB[partialKey], name: searchQuery, source: 'Verified Whole Food' });
           setIsSearching(false);
           return;
         }
 
-        // 2. Fetch from Live Open Food Facts API (Branded & Packaged Products)
+        // Tier 2A: Open Food Facts Global API
         try {
-          const apiRes = await fetch(`https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(rawQuery)}&search_simple=1&action=process&json=1&page_size=1`);
-          const data = await apiRes.json();
+          const offRes = await fetch(`https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(rawQuery)}&search_simple=1&action=process&json=1&page_size=3`);
+          const offData = await offRes.json();
 
-          if (data && data.products && data.products.length > 0) {
-            const prod = data.products[0];
-            const nutriments = prod.nutriments || {};
+          if (offData && offData.products && offData.products.length > 0) {
+            const validProd = offData.products.find(p => p.nutriments && (p.nutriments['energy-kcal_100g'] || p.nutriments['energy-kcal'] || p.nutriments['energy-kcal_serving']));
+            
+            if (validProd) {
+              const n = validProd.nutriments;
+              const cal = n['energy-kcal_serving'] ?? n['energy-kcal_100g'] ?? n['energy-kcal'] ?? 0;
+              const p = n['proteins_serving'] ?? n['proteins_100g'] ?? n['proteins'] ?? 0;
+              const c = n['carbohydrates_serving'] ?? n['carbohydrates_100g'] ?? n['carbohydrates'] ?? 0;
+              const f = n['fat_serving'] ?? n['fat_100g'] ?? n['fat'] ?? 0;
 
-            const calPer100 = nutriments['energy-kcal_100g'] ?? nutriments['energy-kcal'] ?? 200;
-            const pPer100 = nutriments['proteins_100g'] ?? nutriments['proteins'] ?? 5;
-            const cPer100 = nutriments['carbohydrates_100g'] ?? nutriments['carbohydrates'] ?? 25;
-            const fPer100 = nutriments['fat_100g'] ?? nutriments['fat'] ?? 8;
+              if (cal > 0 || p > 0 || c > 0 || f > 0) {
+                setSearchResult({
+                  name: validProd.product_name || searchQuery,
+                  serving: validProd.serving_size || '100g / 1 portion',
+                  calories: Math.round(cal),
+                  protein: Math.round(p * 10) / 10,
+                  carbs: Math.round(c * 10) / 10,
+                  fat: Math.round(f * 10) / 10,
+                  source: 'Open Food Facts DB'
+                });
+                setIsSearching(false);
+                return;
+              }
+            }
+          }
+        } catch (err) {
+          console.warn("Open Food Facts API error, trying USDA DB...", err);
+        }
 
-            const servingText = prod.serving_size || '100g serving';
+        // Tier 2B: USDA FoodData Central Branded Search API
+        try {
+          const usdaRes = await fetch(`https://api.nal.usda.gov/fdc/v1/foods/search?query=${encodeURIComponent(rawQuery)}&pageSize=1&api_key=DEMO_KEY`);
+          const usdaData = await usdaRes.json();
+
+          if (usdaData && usdaData.foods && usdaData.foods.length > 0) {
+            const foodItem = usdaData.foods[0];
+            const nutrients = foodItem.foodNutrients || [];
+
+            const getNutrient = (idList) => {
+              const match = nutrients.find(n => idList.includes(n.nutrientId) || idList.includes(n.nutrientName));
+              return match ? match.value : 0;
+            };
+
+            const cal = getNutrient([1008, 'Energy']);
+            const p = getNutrient([1003, 'Protein']);
+            const c = getNutrient([1005, 'Carbohydrate, by difference']);
+            const f = getNutrient([1004, 'Total lipid (fat)']);
 
             setSearchResult({
-              name: prod.product_name || searchQuery,
-              serving: servingText,
-              calories: Math.round(calPer100),
-              protein: Math.round(pPer100 * 10) / 10,
-              carbs: Math.round(cPer100 * 10) / 10,
-              fat: Math.round(fPer100 * 10) / 10,
-              source: 'Open Food Facts DB'
+              name: `${foodItem.brandOwner ? foodItem.brandOwner + ' - ' : ''}${foodItem.description}`,
+              serving: foodItem.servingSize ? `${foodItem.servingSize}${foodItem.servingSizeUnit || 'g'}` : '1 serving',
+              calories: Math.round(cal),
+              protein: Math.round(p * 10) / 10,
+              carbs: Math.round(c * 10) / 10,
+              fat: Math.round(f * 10) / 10,
+              source: 'USDA Branded DB'
             });
             setIsSearching(false);
             return;
           }
         } catch (err) {
-          console.warn("Live API lookup offline, switching to Category Estimator", err);
+          console.warn("USDA API error, switching to Smart Estimator...", err);
         }
 
-        // 3. Smart Category Parser (For custom, unbranded, or restaurant orders)
+        // Tier 3: Category Estimator Fallback
         let res = { name: searchQuery, serving: '1 standard portion', calories: 250, protein: 12, carbs: 30, fat: 8, source: 'Smart Estimator' };
         
         if (rawQuery.includes('coffee') || rawQuery.includes('latte') || rawQuery.includes('espresso')) {
-          const isLight = rawQuery.includes('black') || rawQuery.includes('skim') || rawQuery.includes('almond') || rawQuery.includes('sugar free') || rawQuery.includes('light') || rawQuery.includes('splash');
+          const isLight = rawQuery.includes('black') || rawQuery.includes('skim') || rawQuery.includes('almond') || rawQuery.includes('sugar free') || rawQuery.includes('light');
           const hasCaramel = rawQuery.includes('caramel');
 
           if (isLight && hasCaramel) {
@@ -705,10 +739,10 @@
 
                   {/* Search Input */}
                   <form onSubmit={handleAISearch} className="relative">
-                    <input type="text" placeholder="Search item (e.g. light iced caramel coffee, egg, apple)..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="w-full pl-10 pr-4 py-3 rounded-xl border border-stone-200 dark:border-zinc-800 bg-stone-50 dark:bg-zinc-950 text-sm" />
+                    <input type="text" placeholder="Search brand or item (e.g. Chobani Vanilla, Fairlife, Apple)..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="w-full pl-10 pr-4 py-3 rounded-xl border border-stone-200 dark:border-zinc-800 bg-stone-50 dark:bg-zinc-950 text-sm" />
                     <div className="absolute left-3 top-3.5 text-stone-400"><IconSearch /></div>
                     <button type="submit" className="mt-3 w-full py-2.5 rounded-xl bg-stone-900 dark:bg-zinc-100 text-stone-100 dark:text-zinc-900 font-semibold text-xs flex items-center justify-center space-x-2">
-                      {isSearching ? <span>Searching Database...</span> : <span>Lookup Macros</span>}
+                      {isSearching ? <span>Searching Databases...</span> : <span>Lookup Macros</span>}
                     </button>
                   </form>
                   
