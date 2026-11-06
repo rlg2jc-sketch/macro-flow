@@ -53,6 +53,7 @@
     const IconSearch = () => <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>;
     const IconRotateCcw = () => <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>;
     const IconTarget = () => <svg className="w-4 h-4 text-stone-600 dark:text-zinc-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" strokeWidth="2"/><circle cx="12" cy="12" r="6" strokeWidth="2"/><circle cx="12" cy="12" r="2" strokeWidth="2"/></svg>;
+    const IconClock = () => <svg className="w-3.5 h-3.5 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>;
 
     // Built-in Precision Food Dictionary (Standard Whole Foods & Drinks)
     const BUILTIN_FOOD_DB = {
@@ -111,6 +112,7 @@
       const [darkMode, setDarkMode] = useState(() => safeLoad('macros_theme', true));
       const [targets, setTargets] = useState(() => safeLoad('macros_targets', DEFAULT_TARGETS));
       const [historyLogs, setHistoryLogs] = useState(() => safeLoad('macros_history_logs', {}));
+      const [frequentFoods, setFrequentFoods] = useState(() => safeLoad('macros_frequent_foods', []));
       
       const currentEstDate = getESTDateString();
       const [entries, setEntries] = useState(() => {
@@ -164,6 +166,13 @@
       }, [entries]);
 
       useEffect(() => { localStorage.setItem('macros_targets', JSON.stringify(targets)); }, [targets]);
+      useEffect(() => { localStorage.setItem('macros_frequent_foods', JSON.stringify(frequentFoods)); }, [frequentFoods]);
+
+      const saveToFrequentFoods = (foodItem) => {
+        const filtered = frequentFoods.filter(item => item.name.toLowerCase() !== foodItem.name.toLowerCase());
+        const updated = [foodItem, ...filtered].slice(0, 10); // Keep top 10 recent unique items
+        setFrequentFoods(updated);
+      };
 
       const consumed = useMemo(() => {
         return entries.reduce(
@@ -215,6 +224,17 @@
           fat: Math.round(baseF * qty * 10) / 10,
           timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         };
+
+        saveToFrequentFoods({
+          name: newEntry.name,
+          serving: portionUnit,
+          calories: baseCal,
+          protein: baseP,
+          carbs: baseC,
+          fat: baseF,
+          source: 'Saved Favorite'
+        });
+
         setEntries([newEntry, ...entries]);
         setFoodName(''); setCalories(''); setProtein(''); setCarbs(''); setFat(''); setPortionQty('1');
       };
@@ -383,6 +403,17 @@
           fat: Math.round(searchResult.fat * mult * 10) / 10,
           timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         };
+
+        saveToFrequentFoods({
+          name: searchResult.name,
+          serving: searchResult.serving,
+          calories: searchResult.calories,
+          protein: searchResult.protein,
+          carbs: searchResult.carbs,
+          fat: searchResult.fat,
+          source: 'Saved Favorite'
+        });
+
         setEntries([newEntry, ...entries]);
         setShowSearchModal(false);
         setSearchResult(null);
@@ -491,7 +522,11 @@
                   {showQuickAdd && (
                     <div className="mb-6 p-3 bg-stone-50 dark:bg-zinc-800/40 rounded-xl border border-stone-200/50 dark:border-zinc-700/50 flex flex-wrap gap-1.5">
                       {QUICK_PRESETS.map((p, idx) => (
-                        <button key={idx} onClick={() => setEntries([{ ...p, id: Date.now().toString(), portionQty: 1, baseCalories: p.calories, baseProtein: p.protein, baseCarbs: p.carbs, baseFat: p.fat, timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }, ...entries])} className="text-xs bg-white dark:bg-zinc-800 border border-stone-200 dark:border-zinc-700 rounded-lg px-2.5 py-1.5 flex items-center space-x-1">
+                        <button key={idx} onClick={() => {
+                          const newEntry = { ...p, id: Date.now().toString(), portionQty: 1, baseCalories: p.calories, baseProtein: p.protein, baseCarbs: p.carbs, baseFat: p.fat, timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) };
+                          setEntries([newEntry, ...entries]);
+                          saveToFrequentFoods({ name: p.name, serving: '1 serving', calories: p.calories, protein: p.protein, carbs: p.carbs, fat: p.fat, source: 'Preset' });
+                        }} className="text-xs bg-white dark:bg-zinc-800 border border-stone-200 dark:border-zinc-700 rounded-lg px-2.5 py-1.5 flex items-center space-x-1">
                           <IconPlus /> <span>{p.name}</span>
                         </button>
                       ))}
@@ -637,32 +672,53 @@
             </div>
           </main>
 
-          {/* AI Search Modal */}
+          {/* AI / Quick Lookup Modal */}
           {showSearchModal && (
             <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-stone-900/40 dark:bg-black/60 backdrop-blur-sm">
-              <div className="w-full max-w-md bg-white dark:bg-zinc-900 rounded-3xl shadow-xl overflow-hidden border border-stone-200 dark:border-zinc-800">
+              <div className="w-full max-w-md bg-white dark:bg-zinc-900 rounded-3xl shadow-xl overflow-hidden border border-stone-200 dark:border-zinc-800 max-h-[90vh] flex flex-col">
                 <div className="p-6 border-b border-stone-100 dark:border-zinc-800 flex justify-between items-center bg-gradient-to-r from-amber-50 to-rose-50 dark:from-zinc-900 dark:to-zinc-900">
                   <div className="flex items-center space-x-2 text-amber-600 dark:text-amber-400">
                     <IconZap />
-                    <h3 className="font-bold">Hybrid Food Lookup</h3>
+                    <h3 className="font-bold">Food Lookup & Quick Select</h3>
                   </div>
                   <button onClick={() => setShowSearchModal(false)} className="text-stone-400 hover:text-stone-600 dark:hover:text-zinc-300">✕</button>
                 </div>
-                <div className="p-6 space-y-4">
+                
+                <div className="p-6 overflow-y-auto space-y-5">
+                  {/* Recent / Favorite Foods Section */}
+                  {frequentFoods.length > 0 && (
+                    <div className="space-y-2">
+                      <div className="flex items-center space-x-1.5 text-xs font-semibold text-stone-500 uppercase tracking-wider">
+                        <IconClock />
+                        <span>Recently Logged Foods</span>
+                      </div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {frequentFoods.map((item, idx) => (
+                          <button key={idx} onClick={() => setSearchResult(item)} className="text-xs bg-stone-50 dark:bg-zinc-800 border border-stone-200 dark:border-zinc-700 hover:border-amber-500 dark:hover:border-amber-500 rounded-xl px-3 py-1.5 text-left transition-colors flex items-center space-x-2">
+                            <span className="font-medium text-stone-900 dark:text-zinc-100">{item.name}</span>
+                            <span className="text-[10px] text-amber-600 dark:text-amber-400 font-mono">({item.calories} kcal)</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Search Input */}
                   <form onSubmit={handleAISearch} className="relative">
-                    <input type="text" placeholder="e.g. light iced caramel coffee, apple, egg" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="w-full pl-10 pr-4 py-3 rounded-xl border border-stone-200 dark:border-zinc-800 bg-stone-50 dark:bg-zinc-950 text-sm" />
+                    <input type="text" placeholder="Search item (e.g. light iced caramel coffee, egg, apple)..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="w-full pl-10 pr-4 py-3 rounded-xl border border-stone-200 dark:border-zinc-800 bg-stone-50 dark:bg-zinc-950 text-sm" />
                     <div className="absolute left-3 top-3.5 text-stone-400"><IconSearch /></div>
                     <button type="submit" className="mt-3 w-full py-2.5 rounded-xl bg-stone-900 dark:bg-zinc-100 text-stone-100 dark:text-zinc-900 font-semibold text-xs flex items-center justify-center space-x-2">
                       {isSearching ? <span>Searching Database...</span> : <span>Lookup Macros</span>}
                     </button>
                   </form>
                   
+                  {/* Selected / Search Result Card */}
                   {searchResult && (
-                    <div className="mt-4 p-4 rounded-xl border border-stone-200 dark:border-zinc-700 bg-stone-50 dark:bg-zinc-800/50">
+                    <div className="p-4 rounded-xl border border-amber-500/30 bg-amber-50/20 dark:bg-zinc-800/60">
                       <div className="flex justify-between items-start mb-3">
                         <div>
                           <p className="font-bold text-sm text-stone-900 dark:text-zinc-100">{searchResult.name}</p>
-                          <p className="text-[10px] text-amber-600 dark:text-amber-400 font-bold uppercase">{searchResult.source} • {searchResult.serving}</p>
+                          <p className="text-[10px] text-amber-600 dark:text-amber-400 font-bold uppercase">{searchResult.source || 'Saved Food'} • {searchResult.serving}</p>
                         </div>
                         <span className="text-amber-600 dark:text-amber-400 font-bold text-sm">{Math.round(searchResult.calories * (parseFloat(searchPortionQty) || 1))} kcal</span>
                       </div>
