@@ -48,12 +48,15 @@
     const IconPlus = ({ className = "w-4 h-4" }) => <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4"/></svg>;
     const IconTrash = () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>;
     const IconPencil = () => <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>;
+    const IconCopy = () => <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>;
     const IconCheck = () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"/></svg>;
     const IconUtensils = () => <svg className="w-4 h-4 text-amber-600 dark:text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>;
     const IconSearch = () => <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>;
     const IconRotateCcw = () => <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>;
     const IconTarget = () => <svg className="w-4 h-4 text-stone-600 dark:text-zinc-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" strokeWidth="2"/><circle cx="12" cy="12" r="6" strokeWidth="2"/><circle cx="12" cy="12" r="2" strokeWidth="2"/></svg>;
     const IconClock = () => <svg className="w-3.5 h-3.5 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>;
+    const IconChevronLeft = () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7"/></svg>;
+    const IconChevronRight = () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7"/></svg>;
 
     // Built-in Precision Food Dictionary (Standard Whole Foods & Drinks)
     const BUILTIN_FOOD_DB = {
@@ -100,11 +103,15 @@
       { name: 'Whey Protein Shake', mealType: 'Snack', calories: 120, protein: 24, carbs: 3, fat: 1.5 },
     ];
 
-    const getESTDateString = () => {
+    const getESTDateString = (offsetDays = 0) => {
       try {
-        return new Date().toLocaleDateString('en-CA', { timeZone: 'America/New_York' });
+        const d = new Date();
+        d.setDate(d.getDate() + offsetDays);
+        return d.toLocaleDateString('en-CA', { timeZone: 'America/New_York' });
       } catch (e) {
-        return new Date().toISOString().split('T')[0];
+        const d = new Date();
+        d.setDate(d.getDate() + offsetDays);
+        return d.toISOString().split('T')[0];
       }
     };
 
@@ -114,11 +121,12 @@
       const [historyLogs, setHistoryLogs] = useState(() => safeLoad('macros_history_logs', {}));
       const [frequentFoods, setFrequentFoods] = useState(() => safeLoad('macros_frequent_foods', []));
       
-      const currentEstDate = getESTDateString();
-      const [entries, setEntries] = useState(() => {
-        const logs = safeLoad('macros_history_logs', {});
-        return Array.isArray(logs[currentEstDate]) ? logs[currentEstDate] : [];
-      });
+      const todayDateStr = getESTDateString(0);
+      const [selectedDate, setSelectedDate] = useState(todayDateStr);
+
+      const entries = useMemo(() => {
+        return Array.isArray(historyLogs[selectedDate]) ? historyLogs[selectedDate] : [];
+      }, [historyLogs, selectedDate]);
 
       const [foodName, setFoodName] = useState('');
       const [calories, setCalories] = useState('');
@@ -134,11 +142,14 @@
       const [showCalcModal, setShowCalcModal] = useState(false);
       const [showHistoryModal, setShowHistoryModal] = useState(false);
       const [showSearchModal, setShowSearchModal] = useState(false);
+      const [copyingEntry, setCopyingEntry] = useState(null);
+      const [copyTargetDate, setCopyTargetDate] = useState(todayDateStr);
       const [tempTargets, setTempTargets] = useState(targets);
 
       const [searchQuery, setSearchQuery] = useState('');
       const [isSearching, setIsSearching] = useState(false);
       const [searchResult, setSearchResult] = useState(null);
+      const [searchResultsList, setSearchResultsList] = useState([]);
       const [searchPortionQty, setSearchPortionQty] = useState('1');
       const [searchTargetMeal, setSearchTargetMeal] = useState('Snack');
 
@@ -160,18 +171,28 @@
       }, [darkMode]);
 
       useEffect(() => {
-        const updatedHistory = { ...historyLogs, [currentEstDate]: entries };
-        setHistoryLogs(updatedHistory);
-        localStorage.setItem('macros_history_logs', JSON.stringify(updatedHistory));
-      }, [entries]);
+        localStorage.setItem('macros_history_logs', JSON.stringify(historyLogs));
+      }, [historyLogs]);
 
       useEffect(() => { localStorage.setItem('macros_targets', JSON.stringify(targets)); }, [targets]);
       useEffect(() => { localStorage.setItem('macros_frequent_foods', JSON.stringify(frequentFoods)); }, [frequentFoods]);
+
+      const setEntriesForDate = (dateStr, newEntries) => {
+        const updated = { ...historyLogs, [dateStr]: newEntries };
+        setHistoryLogs(updated);
+      };
 
       const saveToFrequentFoods = (foodItem) => {
         const filtered = frequentFoods.filter(item => item.name.toLowerCase() !== foodItem.name.toLowerCase());
         const updated = [foodItem, ...filtered].slice(0, 10);
         setFrequentFoods(updated);
+      };
+
+      const changeDateBy = (offset) => {
+        const parts = selectedDate.split('-');
+        const d = new Date(parts[0], parts[1] - 1, parts[2]);
+        d.setDate(d.getDate() + offset);
+        setSelectedDate(d.toISOString().split('T')[0]);
       };
 
       const consumed = useMemo(() => {
@@ -235,13 +256,13 @@
           source: 'Saved Favorite'
         });
 
-        setEntries([newEntry, ...entries]);
+        setEntriesForDate(selectedDate, [newEntry, ...entries]);
         setFoodName(''); setCalories(''); setProtein(''); setCarbs(''); setFat(''); setPortionQty('1');
       };
 
       const handleUpdatePortion = (id, newQty) => {
         const qty = parseFloat(newQty) || 0.1;
-        setEntries(entries.map(entry => {
+        const updated = entries.map(entry => {
           if (entry.id !== id) return entry;
           
           const baseCal = entry.baseCalories !== undefined ? entry.baseCalories : (entry.calories / (entry.portionQty || 1));
@@ -261,7 +282,25 @@
             carbs: Math.round(baseC * qty * 10) / 10,
             fat: Math.round(baseF * qty * 10) / 10,
           };
-        }));
+        });
+        setEntriesForDate(selectedDate, updated);
+      };
+
+      const handleCopyEntry = (entry) => {
+        setCopyingEntry(entry);
+        setCopyTargetDate(todayDateStr);
+      };
+
+      const executeCopyEntry = () => {
+        if (!copyingEntry) return;
+        const existingTargetEntries = Array.isArray(historyLogs[copyTargetDate]) ? historyLogs[copyTargetDate] : [];
+        const copied = {
+          ...copyingEntry,
+          id: Date.now().toString(),
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        };
+        setEntriesForDate(copyTargetDate, [copied, ...existingTargetEntries]);
+        setCopyingEntry(null);
       };
 
       const handleStartEdit = (entry) => {
@@ -282,7 +321,7 @@
         const c = parseFloat(editFormData.carbs) || 0;
         const f = parseFloat(editFormData.fat) || 0;
 
-        setEntries(entries.map(entry => {
+        const updated = entries.map(entry => {
           if (entry.id !== id) return entry;
           return {
             ...entry,
@@ -298,123 +337,125 @@
             carbs: Math.round(c * 10) / 10,
             fat: Math.round(f * 10) / 10,
           };
-        }));
+        });
+        setEntriesForDate(selectedDate, updated);
         setEditingEntryId(null);
       };
 
-      // Upgraded Multi-API Search Engine (Built-in DB -> Open Food Facts -> USDA Branded DB -> Smart Estimator)
+      // Comprehensive Multi-Source Search (Open Food Facts v2 + USDA API + Precision Dictionary)
       const handleAISearch = async (e) => {
         e.preventDefault();
         const rawQuery = searchQuery.trim().toLowerCase();
         if (!rawQuery) return;
         setIsSearching(true);
+        setSearchResult(null);
+        setSearchResultsList([]);
 
-        // Tier 1: Built-in Dictionary
+        let foundList = [];
+
+        // Tier 1: Built-in Precision Dictionary Match
         if (BUILTIN_FOOD_DB[rawQuery]) {
-          setSearchResult({ ...BUILTIN_FOOD_DB[rawQuery], source: 'Verified Whole Food' });
-          setIsSearching(false);
-          return;
+          foundList.push({ ...BUILTIN_FOOD_DB[rawQuery], source: 'Verified Whole Food' });
+        } else {
+          const partialKey = Object.keys(BUILTIN_FOOD_DB).find(k => rawQuery.includes(k) || k.includes(rawQuery));
+          if (partialKey) {
+            foundList.push({ ...BUILTIN_FOOD_DB[partialKey], name: searchQuery, source: 'Verified Whole Food' });
+          }
         }
 
-        const partialKey = Object.keys(BUILTIN_FOOD_DB).find(k => rawQuery.includes(k) || k.includes(rawQuery));
-        if (partialKey) {
-          setSearchResult({ ...BUILTIN_FOOD_DB[partialKey], name: searchQuery, source: 'Verified Whole Food' });
-          setIsSearching(false);
-          return;
-        }
-
-        // Tier 2A: Open Food Facts Global API
+        // Tier 2: Open Food Facts API v2 (Multi-Product Search)
         try {
-          const offRes = await fetch(`https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(rawQuery)}&search_simple=1&action=process&json=1&page_size=3`);
-          const offData = await offRes.json();
+          const offRes = await fetch(`https://world.openfoodfacts.org/api/v2/search?categories_tags_en=${encodeURIComponent(rawQuery)}&fields=product_name,brands,serving_size,nutriments&page_size=5`);
+          let offData = await offRes.json();
+
+          if (!offData.products || offData.products.length === 0) {
+            const fallbackRes = await fetch(`https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(rawQuery)}&search_simple=1&action=process&json=1&page_size=5`);
+            offData = await fallbackRes.json();
+          }
 
           if (offData && offData.products && offData.products.length > 0) {
-            const validProd = offData.products.find(p => p.nutriments && (p.nutriments['energy-kcal_100g'] || p.nutriments['energy-kcal'] || p.nutriments['energy-kcal_serving']));
-            
-            if (validProd) {
-              const n = validProd.nutriments;
+            offData.products.forEach(prod => {
+              const n = prod.nutriments || {};
               const cal = n['energy-kcal_serving'] ?? n['energy-kcal_100g'] ?? n['energy-kcal'] ?? 0;
               const p = n['proteins_serving'] ?? n['proteins_100g'] ?? n['proteins'] ?? 0;
               const c = n['carbohydrates_serving'] ?? n['carbohydrates_100g'] ?? n['carbohydrates'] ?? 0;
               const f = n['fat_serving'] ?? n['fat_100g'] ?? n['fat'] ?? 0;
 
               if (cal > 0 || p > 0 || c > 0 || f > 0) {
-                setSearchResult({
-                  name: validProd.product_name || searchQuery,
-                  serving: validProd.serving_size || '100g / 1 portion',
+                const brandStr = prod.brands ? `${prod.brands} - ` : '';
+                foundList.push({
+                  name: `${brandStr}${prod.product_name || searchQuery}`,
+                  serving: prod.serving_size || '100g / 1 portion',
                   calories: Math.round(cal),
                   protein: Math.round(p * 10) / 10,
                   carbs: Math.round(c * 10) / 10,
                   fat: Math.round(f * 10) / 10,
                   source: 'Open Food Facts DB'
                 });
-                setIsSearching(false);
-                return;
               }
+            });
+          }
+        } catch (err) {
+          console.warn("Open Food Facts v2 error, trying USDA API...", err);
+        }
+
+        // Tier 3: USDA FoodData Central Branded Search API
+        if (foundList.length < 3) {
+          try {
+            const usdaRes = await fetch(`https://api.nal.usda.gov/fdc/v1/foods/search?query=${encodeURIComponent(rawQuery)}&pageSize=5&api_key=DEMO_KEY`);
+            const usdaData = await usdaRes.json();
+
+            if (usdaData && usdaData.foods && usdaData.foods.length > 0) {
+              usdaData.foods.forEach(foodItem => {
+                const nutrients = foodItem.foodNutrients || [];
+                const getNutrient = (idList) => {
+                  const match = nutrients.find(n => idList.includes(n.nutrientId) || idList.includes(n.nutrientName));
+                  return match ? match.value : 0;
+                };
+
+                const cal = getNutrient([1008, 'Energy']);
+                const p = getNutrient([1003, 'Protein']);
+                const c = getNutrient([1005, 'Carbohydrate, by difference']);
+                const f = getNutrient([1004, 'Total lipid (fat)']);
+
+                if (cal > 0 || p > 0) {
+                  foundList.push({
+                    name: `${foodItem.brandOwner ? foodItem.brandOwner + ' - ' : ''}${foodItem.description}`,
+                    serving: foodItem.servingSize ? `${foodItem.servingSize}${foodItem.servingSizeUnit || 'g'}` : '1 serving',
+                    calories: Math.round(cal),
+                    protein: Math.round(p * 10) / 10,
+                    carbs: Math.round(c * 10) / 10,
+                    fat: Math.round(f * 10) / 10,
+                    source: 'USDA Branded DB'
+                  });
+                }
+              });
+            }
+          } catch (err) {
+            console.warn("USDA API error...", err);
+          }
+        }
+
+        // Tier 4: Category Estimator Fallback if no API matches
+        if (foundList.length === 0) {
+          let res = { name: searchQuery, serving: '1 standard portion', calories: 250, protein: 12, carbs: 30, fat: 8, source: 'Smart Estimator' };
+          if (rawQuery.includes('coffee') || rawQuery.includes('latte')) {
+            const isLight = rawQuery.includes('black') || rawQuery.includes('skim') || rawQuery.includes('almond') || rawQuery.includes('light');
+            const hasCaramel = rawQuery.includes('caramel');
+
+            if (isLight && hasCaramel) {
+              res = { name: searchQuery, serving: '1 Medium (16 oz)', calories: 70, protein: 1, carbs: 14, fat: 1, source: 'Light Beverage DB' };
+            } else if (hasCaramel) {
+              res = { name: searchQuery, serving: '1 Medium (16 oz)', calories: 230, protein: 4, carbs: 38, fat: 7, source: 'Commercial Beverage DB' };
+            } else {
+              res = { name: searchQuery, serving: '1 Medium (16 oz)', calories: 140, protein: 3, carbs: 22, fat: 4, source: 'Beverage DB' };
             }
           }
-        } catch (err) {
-          console.warn("Open Food Facts API error, trying USDA DB...", err);
+          foundList.push(res);
         }
 
-        // Tier 2B: USDA FoodData Central Branded Search API
-        try {
-          const usdaRes = await fetch(`https://api.nal.usda.gov/fdc/v1/foods/search?query=${encodeURIComponent(rawQuery)}&pageSize=1&api_key=DEMO_KEY`);
-          const usdaData = await usdaRes.json();
-
-          if (usdaData && usdaData.foods && usdaData.foods.length > 0) {
-            const foodItem = usdaData.foods[0];
-            const nutrients = foodItem.foodNutrients || [];
-
-            const getNutrient = (idList) => {
-              const match = nutrients.find(n => idList.includes(n.nutrientId) || idList.includes(n.nutrientName));
-              return match ? match.value : 0;
-            };
-
-            const cal = getNutrient([1008, 'Energy']);
-            const p = getNutrient([1003, 'Protein']);
-            const c = getNutrient([1005, 'Carbohydrate, by difference']);
-            const f = getNutrient([1004, 'Total lipid (fat)']);
-
-            setSearchResult({
-              name: `${foodItem.brandOwner ? foodItem.brandOwner + ' - ' : ''}${foodItem.description}`,
-              serving: foodItem.servingSize ? `${foodItem.servingSize}${foodItem.servingSizeUnit || 'g'}` : '1 serving',
-              calories: Math.round(cal),
-              protein: Math.round(p * 10) / 10,
-              carbs: Math.round(c * 10) / 10,
-              fat: Math.round(f * 10) / 10,
-              source: 'USDA Branded DB'
-            });
-            setIsSearching(false);
-            return;
-          }
-        } catch (err) {
-          console.warn("USDA API error, switching to Smart Estimator...", err);
-        }
-
-        // Tier 3: Category Estimator Fallback
-        let res = { name: searchQuery, serving: '1 standard portion', calories: 250, protein: 12, carbs: 30, fat: 8, source: 'Smart Estimator' };
-        
-        if (rawQuery.includes('coffee') || rawQuery.includes('latte') || rawQuery.includes('espresso')) {
-          const isLight = rawQuery.includes('black') || rawQuery.includes('skim') || rawQuery.includes('almond') || rawQuery.includes('sugar free') || rawQuery.includes('light');
-          const hasCaramel = rawQuery.includes('caramel');
-
-          if (isLight && hasCaramel) {
-            res = { name: searchQuery, serving: '1 Medium (16 oz)', calories: 70, protein: 1, carbs: 14, fat: 1, source: 'Light Beverage DB' };
-          } else if (hasCaramel) {
-            res = { name: searchQuery, serving: '1 Medium (16 oz)', calories: 230, protein: 4, carbs: 38, fat: 7, source: 'Commercial Beverage DB' };
-          } else if (isLight) {
-            res = { name: searchQuery, serving: '1 Medium (16 oz)', calories: 25, protein: 1, carbs: 3, fat: 1, source: 'Beverage DB' };
-          } else {
-            res = { name: searchQuery, serving: '1 Medium (16 oz)', calories: 140, protein: 3, carbs: 22, fat: 4, source: 'Beverage DB' };
-          }
-        } else if (rawQuery.includes('chipotle') || rawQuery.includes('burrito') || rawQuery.includes('taco')) {
-          res = { name: searchQuery, serving: '1 Meal Portion', calories: 650, protein: 54, carbs: 68, fat: 18, source: 'Restaurant DB' };
-        } else if (rawQuery.includes('chicken') || rawQuery.includes('turkey') || rawQuery.includes('salmon') || rawQuery.includes('tuna')) {
-          res = { name: searchQuery, serving: '150g portion', calories: 240, protein: 42, carbs: 0, fat: 7, source: 'Protein DB' };
-        }
-
-        setSearchResult(res);
+        setSearchResultsList(foundList);
+        setSearchResult(foundList[0]);
         setIsSearching(false);
       };
 
@@ -448,9 +489,10 @@
           source: 'Saved Favorite'
         });
 
-        setEntries([newEntry, ...entries]);
+        setEntriesForDate(selectedDate, [newEntry, ...entries]);
         setShowSearchModal(false);
         setSearchResult(null);
+        setSearchResultsList([]);
         setSearchQuery('');
       };
 
@@ -466,7 +508,7 @@
         <div className="min-h-screen bg-stone-50 dark:bg-zinc-950 text-stone-800 dark:text-zinc-100 font-sans transition-colors pb-20">
           {/* Header */}
           <header className="sticky top-0 z-30 backdrop-blur-md bg-stone-50/80 dark:bg-zinc-950/80 border-b border-stone-200/60 dark:border-zinc-800/60">
-            <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
+            <div className="max-w-6xl mx-auto px-4 py-3.5 flex flex-wrap items-center justify-between gap-3">
               <div className="flex items-center space-x-3">
                 <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-stone-900 to-stone-700 dark:from-zinc-100 dark:to-zinc-300 flex items-center justify-center shadow-md">
                   <IconSparkles />
@@ -475,6 +517,20 @@
                   <h1 className="text-xl font-extrabold tracking-tight bg-gradient-to-r from-stone-900 to-stone-600 dark:from-zinc-100 dark:to-zinc-400 bg-clip-text text-transparent">MacroFlow</h1>
                   <p className="text-[11px] font-medium text-stone-500 uppercase tracking-wide hidden sm:block">Chic Daily Atelier</p>
                 </div>
+              </div>
+
+              {/* Day Navigator */}
+              <div className="flex items-center bg-stone-200/60 dark:bg-zinc-800/60 p-1 rounded-2xl border border-stone-300/40 dark:border-zinc-700/40 text-xs font-semibold">
+                <button onClick={() => changeDateBy(-1)} className="p-1.5 rounded-xl hover:bg-white dark:hover:bg-zinc-700 transition-colors">
+                  <IconChevronLeft />
+                </button>
+                <div className="px-3 py-1 flex items-center space-x-2">
+                  <input type="date" value={selectedDate} onChange={e => setSelectedDate(e.target.value)} className="bg-transparent text-center font-mono focus:outline-none cursor-pointer" />
+                  {selectedDate === todayDateStr && <span className="text-[10px] bg-amber-500 text-white px-1.5 py-0.5 rounded-full font-sans uppercase">Today</span>}
+                </div>
+                <button onClick={() => changeDateBy(1)} className="p-1.5 rounded-xl hover:bg-white dark:hover:bg-zinc-700 transition-colors">
+                  <IconChevronRight />
+                </button>
               </div>
 
               <div className="flex items-center space-x-2">
@@ -546,7 +602,7 @@
                   <div className="flex items-center justify-between mb-5">
                     <div className="flex items-center space-x-2">
                       <IconUtensils />
-                      <h2 className="text-sm font-bold uppercase tracking-wider">Log Intake</h2>
+                      <h2 className="text-sm font-bold uppercase tracking-wider">Log Intake ({selectedDate})</h2>
                     </div>
                     <button onClick={() => setShowQuickAdd(!showQuickAdd)} className="text-xs text-stone-500 hover:text-stone-900 dark:hover:text-zinc-100">
                       {showQuickAdd ? 'Hide Presets' : 'Presets'}
@@ -558,7 +614,7 @@
                       {QUICK_PRESETS.map((p, idx) => (
                         <button key={idx} onClick={() => {
                           const newEntry = { ...p, id: Date.now().toString(), portionQty: 1, baseCalories: p.calories, baseProtein: p.protein, baseCarbs: p.carbs, baseFat: p.fat, timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) };
-                          setEntries([newEntry, ...entries]);
+                          setEntriesForDate(selectedDate, [newEntry, ...entries]);
                           saveToFrequentFoods({ name: p.name, serving: '1 serving', calories: p.calories, protein: p.protein, carbs: p.carbs, fat: p.fat, source: 'Preset' });
                         }} className="text-xs bg-white dark:bg-zinc-800 border border-stone-200 dark:border-zinc-700 rounded-lg px-2.5 py-1.5 flex items-center space-x-1">
                           <IconPlus /> <span>{p.name}</span>
@@ -613,16 +669,16 @@
               <section className="lg:col-span-7 space-y-6">
                 <div className="rounded-2xl border border-stone-200/70 dark:border-zinc-800/80 bg-white dark:bg-zinc-900 p-6 shadow-sm">
                   <div className="flex items-center justify-between mb-6 pb-4 border-b border-stone-100 dark:border-zinc-800">
-                    <h2 className="text-sm font-bold uppercase tracking-wider">Today's Log ({entries.length})</h2>
+                    <h2 className="text-sm font-bold uppercase tracking-wider">Log for {selectedDate} ({entries.length})</h2>
                     {entries.length > 0 && (
-                      <button onClick={() => setEntries([])} className="text-xs text-rose-500 hover:text-rose-600 flex items-center space-x-1">
-                        <IconRotateCcw /> <span>Reset</span>
+                      <button onClick={() => setEntriesForDate(selectedDate, [])} className="text-xs text-rose-500 hover:text-rose-600 flex items-center space-x-1">
+                        <IconRotateCcw /> <span>Reset Day</span>
                       </button>
                     )}
                   </div>
 
                   {entries.length === 0 ? (
-                    <p className="text-center py-12 text-xs text-stone-400">No food logged today.</p>
+                    <p className="text-center py-12 text-xs text-stone-400">No food logged for this day.</p>
                   ) : (
                     <div className="space-y-6">
                       {meals.map(m => {
@@ -667,10 +723,13 @@
                                           <span className="text-[10px] text-stone-500 ml-2">{entry.timestamp}</span>
                                         </div>
                                         <div className="flex items-center space-x-1">
+                                          <button onClick={() => handleCopyEntry(entry)} className="p-1 text-stone-400 hover:text-indigo-500 transition-colors" title="Copy item to another day">
+                                            <IconCopy />
+                                          </button>
                                           <button onClick={() => handleStartEdit(entry)} className="p-1 text-stone-400 hover:text-amber-500 transition-colors" title="Edit details">
                                             <IconPencil />
                                           </button>
-                                          <button onClick={() => setEntries(entries.filter(e => e.id !== entry.id))} className="p-1 text-stone-400 hover:text-rose-500 transition-colors">
+                                          <button onClick={() => setEntriesForDate(selectedDate, entries.filter(e => e.id !== entry.id))} className="p-1 text-stone-400 hover:text-rose-500 transition-colors">
                                             <IconTrash />
                                           </button>
                                         </div>
@@ -705,6 +764,26 @@
               </section>
             </div>
           </main>
+
+          {/* Copy Entry to Another Day Modal */}
+          {copyingEntry && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-stone-900/40 dark:bg-black/60 backdrop-blur-sm">
+              <div className="w-full max-w-sm bg-white dark:bg-zinc-900 rounded-3xl shadow-xl border border-stone-200 dark:border-zinc-800 p-6 space-y-4">
+                <div className="flex justify-between items-center pb-2 border-b border-stone-100 dark:border-zinc-800">
+                  <h3 className="font-bold text-sm text-stone-900 dark:text-zinc-100 flex items-center space-x-2">
+                    <IconCopy /> <span>Copy Entry</span>
+                  </h3>
+                  <button onClick={() => setCopyingEntry(null)} className="text-stone-400">✕</button>
+                </div>
+                <p className="text-xs text-stone-500">Copying <strong>{copyingEntry.name}</strong> ({copyingEntry.calories} kcal) to:</p>
+                <div>
+                  <label className="block text-xs font-medium text-stone-500 mb-1">Target Date</label>
+                  <input type="date" value={copyTargetDate} onChange={e => setCopyTargetDate(e.target.value)} className="w-full p-2.5 rounded-xl border border-stone-200 dark:border-zinc-700 bg-stone-50 dark:bg-zinc-950 text-sm font-mono" />
+                </div>
+                <button onClick={executeCopyEntry} className="w-full py-2.5 rounded-xl bg-indigo-600 text-white font-semibold text-xs">Copy to Date</button>
+              </div>
+            </div>
+          )}
 
           {/* AI / Quick Lookup Modal */}
           {showSearchModal && (
@@ -745,6 +824,21 @@
                       {isSearching ? <span>Searching Databases...</span> : <span>Lookup Macros</span>}
                     </button>
                   </form>
+
+                  {/* Search Results Picker List */}
+                  {searchResultsList.length > 1 && (
+                    <div className="space-y-1.5 border-t border-stone-100 dark:border-zinc-800 pt-3">
+                      <p className="text-[10px] font-bold text-stone-400 uppercase tracking-wider">Search Results Matches ({searchResultsList.length})</p>
+                      <div className="max-h-36 overflow-y-auto space-y-1">
+                        {searchResultsList.map((res, i) => (
+                          <button key={i} onClick={() => setSearchResult(res)} className={`w-full text-left p-2 rounded-lg text-xs flex justify-between items-center transition-colors ${searchResult && searchResult.name === res.name ? 'bg-amber-100 dark:bg-zinc-800 font-bold border border-amber-300' : 'bg-stone-50 dark:bg-zinc-950'}`}>
+                            <span className="truncate pr-2">{res.name}</span>
+                            <span className="font-mono text-amber-600 dark:text-amber-400">{res.calories} kcal</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                   
                   {/* Selected / Search Result Card */}
                   {searchResult && (
@@ -773,7 +867,7 @@
                           </select>
                         </div>
                       </div>
-                      <button onClick={handleAddSearchResult} className="w-full py-2 rounded-lg bg-amber-500 text-white font-bold text-xs">Add to Log</button>
+                      <button onClick={handleAddSearchResult} className="w-full py-2 rounded-lg bg-amber-500 text-white font-bold text-xs">Add to Log ({selectedDate})</button>
                     </div>
                   )}
                 </div>
@@ -852,8 +946,8 @@
                     Object.entries(historyLogs).sort((a,b) => b[0].localeCompare(a[0])).map(([date, dateEntries]) => {
                       const safeEntries = Array.isArray(dateEntries) ? dateEntries : [];
                       return (
-                        <div key={date} className="p-4 rounded-xl border border-stone-200 dark:border-zinc-700 bg-stone-50 dark:bg-zinc-800/30">
-                          <div className="font-bold text-sm mb-2">{date === currentEstDate ? 'Today' : date}</div>
+                        <div key={date} onClick={() => { setSelectedDate(date); setShowHistoryModal(false); }} className="p-4 rounded-xl border border-stone-200 dark:border-zinc-700 bg-stone-50 dark:bg-zinc-800/30 hover:border-amber-500 cursor-pointer transition-colors">
+                          <div className="font-bold text-sm mb-1">{date === todayDateStr ? 'Today' : date}</div>
                           <div className="text-xs space-y-1 text-stone-600 dark:text-zinc-400">
                             {safeEntries.length} items logged • {safeEntries.reduce((s, e) => s + Number(e.calories || 0), 0)} kcal total
                           </div>
